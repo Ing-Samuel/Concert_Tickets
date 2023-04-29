@@ -7,13 +7,14 @@
 @using CurrieTechnologies.Razor.SweetAlert2;
 @inject SweetAlertService sweetAlertService
 @inject IRepository repository
+@inject IJSRuntime jsRuntime
 
 
 
 
 <PageTitle>Index</PageTitle>
 
-<input type="number" @bind-value="Id" />
+<input type="number" @bind-value="Id" disabled="@campoBloqueado"/>
 <button @onclick="SearchTicked">Buscar</button>
 
 @if (ticketEncontrado != null)
@@ -28,6 +29,7 @@
 @code {
     public Ticket? ticketEncontrado { get; set; }
     public int Id { get; set; }
+    private bool campoBloqueado;
 
 
     protected async Task SearchTicked()
@@ -35,14 +37,28 @@
         var responseHttp = await repository.Get<Ticket>($"/api/tickets/{Id}");
         if (responseHttp.Error)
         {
-            //if (responseHttp.HttpResponseMessage.StatusCode == HttpStatusCode.NotFound)
-            //{
-            //    return;
-            //}
             var message = await responseHttp.GetErrorMessageAsync();
             await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
             return;
         }
+
         ticketEncontrado = responseHttp.Response;
+
+        if(ticketEncontrado!.Used == true)
+        {
+            //Funcion que se llama si el Tiquete Existe y Fue Usado
+        }
+
+        //Aqui Funcion a llamar si El Tiquete Exite pero, aún no ha sido Registrado
+        campoBloqueado = true;
     }
+
+    bool showModal = false;
+
+    public async Task ShowModal()
+    {
+        showModal = true;
+        await jsRuntime.InvokeAsync<object>("$('#myModal').modal", "show");
+    }
+
 }

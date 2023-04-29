@@ -22,7 +22,7 @@ namespace Concert.Api.Data
             {
                 var tickets = new List<Ticket>();
 
-                for (int i = 0; i < 5000; i++)
+                for (int i = 0; i < 50000; i++)
                 {
                     tickets.Add(new Ticket { UseDate = null, EntrySite = null, Used = false });
                 }

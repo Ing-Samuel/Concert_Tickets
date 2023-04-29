@@ -9,32 +9,75 @@
 @inject IRepository repository
 @inject IJSRuntime jsRuntime
 
+<style>
+    .container-fluid {
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+    }
+</style>
 
 
 
 <PageTitle>Index</PageTitle>
 
-<input type="number" @bind-value="Id" disabled="@campoBloqueado"/>
-<button @onclick="SearchTicked">Buscar</button>
 
-@if (ticketEncontrado != null)
-{
-    <h2>Ticket Encontrado:</h2>
-    <p>ID: @ticketEncontrado.Id</p>
-    <p>Fecha de Uso: @ticketEncontrado.UseDate</p>
-    <p>Entrada en: @ticketEncontrado.EntrySite</p>
-}
+<div class="container-fluid d-flex justify-content-center align-items-center flex-column">
+    <div class="form-group">
+        <h3>Consulta y Registro De Tiquetes</h3>
+        <label for="id" class="mt-4">ID Del Tiquete</label>
+        <input type="number" class="form-control" id="id" @bind-value="Id" disabled="@campoBloqueado" />
+        <button class="btn btn-primary mt-4" type="button" @onclick="SearchTicked" disabled="@campoBloqueado">Buscar</button>
+
+        @if (ticketEncontrado != null)
+        {
+            if (ticketEncontrado!.Used == false)
+            {
+                <div class="container mt-5" style="@visible">
+                    <form>
+                        <div class="form-group">
+                            <label for="fecha">Fecha de Registro</label>
+                            <input type="date" class="form-control" id="fecha" @bind="Fecha" />
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="hora">Hora de Registro</label>
+                            <input type="time" class="form-control" id="hora" @bind="Hora" />
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="portería">Porteria</label>
+
+                            <select class="form-control mt-3" id="portería" @bind="Porteria">
+                                <option value="">Selecciona una opción</option>
+                                <option value="Norte">Norte</option>
+                                <option value="Sur">Sur</option>
+                                <option value="Oriental">Oriental</option>
+                                <option value="Occidental">Occidental</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-primary mt-4" @onclick="UpdateTicked">Registrar visita</button>
+                    </form>
+                </div>
+            }
+        }
+    </div>
+</div>
+
 
 
 @code {
     public Ticket? ticketEncontrado { get; set; }
     public int Id { get; set; }
     private bool campoBloqueado;
+    private string visible = "display: none;";
+
+    public DateTime Fecha { get; set; } = DateTime.Now;
+    public TimeOnly Hora { get; set; }
+    public string? Porteria { get; set; }
 
 
     protected async Task SearchTicked()
     {
         var responseHttp = await repository.Get<Ticket>($"/api/tickets/{Id}");
+
         if (responseHttp.Error)
         {
             var message = await responseHttp.GetErrorMessageAsync();
@@ -44,21 +87,70 @@
 
         ticketEncontrado = responseHttp.Response;
 
-        if(ticketEncontrado!.Used == true)
+        if (ticketEncontrado!.Used == true)
         {
-            //Funcion que se llama si el Tiquete Existe y Fue Usado
+            string mensaje = $"<p>El Tiquete Ya fue Registrado en la Porteria : <b>{ticketEncontrado.EntrySite!.ToUpper()}</b></p><p>Fecha de Registro : <b>{ticketEncontrado.UseDate}</b></p>";
+            await sweetAlertService.FireAsync("Tiquete En Uso", mensaje, SweetAlertIcon.Info);
+            return;
         }
+        campoBloqueado = true;
+        visible = null!;
 
         //Aqui Funcion a llamar si El Tiquete Exite pero, aún no ha sido Registrado
-        campoBloqueado = true;
+        var toast2 = sweetAlertService.Mixin(new SweetAlertOptions
+            {
+                Toast = true,
+                Position = SweetAlertPosition.TopEnd,
+                ShowConfirmButton = false,
+                Timer = 1500
+            });
+        await toast2.FireAsync(icon: SweetAlertIcon.Success, message: "Tiquete Valido");
+
     }
 
-    bool showModal = false;
-
-    public async Task ShowModal()
+    protected async Task UpdateTicked()
     {
-        showModal = true;
-        await jsRuntime.InvokeAsync<object>("$('#myModal').modal", "show");
+        if (!ValidarDatos())
+        {
+            return;
+        }
+
+        DateTime combinedDateTime = new DateTime(Fecha.Year, Fecha.Month, Fecha.Day, Hora.Hour, Hora.Minute, Hora.Second);
+
+        ticketEncontrado!.EntrySite = Porteria;
+        ticketEncontrado.UseDate = combinedDateTime;
+        ticketEncontrado.Used = true;
+
+
+
+        var responseHttp = await repository.Put("/api/tickets", ticketEncontrado);
+
+        if (responseHttp.Error)
+        {
+            var message = await responseHttp.GetErrorMessageAsync();
+            await sweetAlertService.FireAsync("Errror", message, SweetAlertIcon.Error);
+            return;
+        }
+        campoBloqueado = false;
+        visible = "display: none;"
+        ;
+        await sweetAlertService.FireAsync("Registro Exitoso", "El tiquete se ha Registrado Correctamente", SweetAlertIcon.Success);
     }
 
+    private  bool ValidarDatos()
+    {
+        bool esValido = true;
+        if (Fecha == null || Fecha > DateTime.Now)
+        {
+             sweetAlertService.FireAsync("Error", "El Campo Fecha Es Obligatorio", SweetAlertIcon.Error);
+            esValido = false;
+        }
+
+        if (Porteria == null || Porteria.Length > 50)
+        {
+             sweetAlertService.FireAsync("Error", "El Campo Porteria Es Obligatorio", SweetAlertIcon.Error);
+            esValido = false;
+        }
+        return esValido;
+    }
 }

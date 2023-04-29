@@ -1,0 +1,48 @@
+﻿@page "/"
+@using Concert.Shared.Entities
+@using Concert.WEB.Repositories
+@using Concert.Web.Repositories;
+@using System.Net;
+@using System.Net.Http.Json
+@using CurrieTechnologies.Razor.SweetAlert2;
+@inject SweetAlertService sweetAlertService
+@inject IRepository repository
+
+
+
+
+<PageTitle>Index</PageTitle>
+
+<input type="number" @bind-value="Id" />
+<button @onclick="SearchTicked">Buscar</button>
+
+@if (ticketEncontrado != null)
+{
+    <h2>Ticket Encontrado:</h2>
+    <p>ID: @ticketEncontrado.Id</p>
+    <p>Fecha de Uso: @ticketEncontrado.UseDate</p>
+    <p>Entrada en: @ticketEncontrado.EntrySite</p>
+}
+
+
+@code {
+    public Ticket? ticketEncontrado { get; set; }
+    public int Id { get; set; }
+
+
+    protected async Task SearchTicked()
+    {
+        var responseHttp = await repository.Get<Ticket>($"/api/tickets/{Id}");
+        if (responseHttp.Error)
+        {
+            //if (responseHttp.HttpResponseMessage.StatusCode == HttpStatusCode.NotFound)
+            //{
+            //    return;
+            //}
+            var message = await responseHttp.GetErrorMessageAsync();
+            await sweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+            return;
+        }
+        ticketEncontrado = responseHttp.Response;
+    }
+}
